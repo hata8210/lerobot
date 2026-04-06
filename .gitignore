@@ -155,13 +155,21 @@ cython_debug/
 
 # Project Specific
 logs/
-outputs/
-models/
 UNKNOWN.egg-info/
 CLI-Tool/temp.txt
 CLI-Tool/.idea/
 
+# Model Weights and Large Binaries (Ignore weights but keep folders)
+*.safetensors
+*.onnx
+*.bin
+*.pt
+*.pth
+*.ckpt
+*.weights
+*.h5
+*.model
+
 # Dataset files (large binaries)
 *.mp4
 *.parquet
-*.h5
