@@ -24,10 +24,10 @@ except ImportError:
     ref_tool = None
 
 # Stream API URLs
-STREAM_API_URL = "http://127.0.0.1:8001/api/stream"
-JOINT_STREAM_API_URL = "http://127.0.0.1:8001/api/joint_stream"
-RESTORE_API_URL = "http://127.0.0.1:8001/api/restore_initial"
-JOINTS_API_URL = "http://127.0.0.1:8001/api/joints"
+STREAM_API_URL = "http://192.168.31.7:8001/api/stream"
+JOINT_STREAM_API_URL = "http://192.168.31.7:8001/api/joint_stream"
+RESTORE_API_URL = "http://192.168.31.7:8001/api/restore_initial"
+JOINTS_API_URL = "http://192.168.31.7:8001/api/joints"
 
 
 class DummyStreamRobot(Robot):
