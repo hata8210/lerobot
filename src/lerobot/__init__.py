@@ -167,6 +167,7 @@ available_robots = [
     "so100",
     "so101",
     "dummy",
+    "dummy_stream",
 ]
 
 # lists all available cameras from `lerobot/cameras`

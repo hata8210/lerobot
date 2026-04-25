@@ -21,7 +21,7 @@ from lerobot.teleoperators.mobile.config_mobile import MobileConfig
 from lerobot.teleoperators.mobile.teleop_mobile import MobileTeleop
 from lerobot.utils.robot_utils import precise_sleep
 
-FPS = 30
+FPS = 50
 # 假设你的流式API服务器IP为 127.0.0.1，端口为 8001 (请根据实际情况修改IP)
 STREAM_API_URL = "http://127.0.0.1:8001/api/stream"
 JOINT_STREAM_API_URL = "http://127.0.0.1:8001/api/joint_stream"
