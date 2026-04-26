@@ -192,7 +192,15 @@ def teleop_loop(
             print(f"{'NAME':<{display_len}} | {'NORM':>7}")
             # Display the final robot action that was sent
             for motor, value in robot_action_to_send.items():
-                print(f"{motor:<{display_len}} | {value:>7.2f}")
+                if isinstance(value, (int, float)):
+                    print(f"{motor:<{display_len}} | {value:>7.2f}")
+                elif hasattr(value, "numel") and value.numel() == 1:
+                    print(f"{motor:<{display_len}} | {value.item():>7.2f}")
+                else:
+                    value_str = str(value)
+                    if len(value_str) > 7:
+                        value_str = value_str[:4] + "..."
+                    print(f"{motor:<{display_len}} | {value_str:>7}")
             move_cursor_up(len(robot_action_to_send) + 3)
 
         dt_s = time.perf_counter() - loop_start

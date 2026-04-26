@@ -23,13 +23,6 @@ try:
 except ImportError:
     ref_tool = None
 
-# Stream API URLs
-STREAM_API_URL = "http://192.168.31.7:8001/api/stream"
-JOINT_STREAM_API_URL = "http://192.168.31.7:8001/api/joint_stream"
-RESTORE_API_URL = "http://192.168.31.7:8001/api/restore_initial"
-JOINTS_API_URL = "http://192.168.31.7:8001/api/joints"
-
-
 class DummyStreamRobot(Robot):
     config_class = DummyStreamRobotConfig
     name = "dummy_stream"
@@ -41,6 +34,13 @@ class DummyStreamRobot(Robot):
         self._is_connected = False
         self.cameras = make_cameras_from_configs(config.cameras)
         
+        # Dynamic API URLs based on config
+        base_url = f"http://{config.ip}:{config.port}"
+        self.stream_api_url = f"{base_url}/api/stream"
+        self.joint_stream_api_url = f"{base_url}/api/joint_stream"
+        self.restore_api_url = f"{base_url}/api/restore_initial"
+        self.joints_api_url = f"{base_url}/api/joints"
+
         self.joint_bias = {
             1: 0,
             2: 77,
@@ -78,11 +78,7 @@ class DummyStreamRobot(Robot):
 
     @cached_property
     def action_features(self) -> dict[str, type]:
-        return {
-            **{f"joint_{i}.pos": float for i in range(1, 7)},
-            "mobile.raw_inputs": dict,
-            "mobile.enabled": bool,
-        }
+        return {f"joint_{i}.pos": float for i in range(1, 7)}
 
     @property
     def is_connected(self) -> bool:
@@ -120,20 +116,20 @@ class DummyStreamRobot(Robot):
         payload = {"x": x, "y": y, "z": z, "roll": roll, "pitch": pitch, "yaw": yaw}
         try:
             # Very short timeout for control commands
-            self.session.post(STREAM_API_URL, json=payload, timeout=(0.01, 0.02))
+            self.session.post(self.stream_api_url, json=payload, timeout=(0.01, 0.02))
         except:
             pass
 
     def _send_joint_stream(self, v1=0.0, v2=0.0, v3=0.0, v4=0.0, v5=0.0, v6=0.0):
         payload = {"v1": v1, "v2": v2, "v3": v3, "v4": v4, "v5": v5, "v6": v6}
         try:
-            self.session.post(JOINT_STREAM_API_URL, json=payload, timeout=(0.01, 0.02))
+            self.session.post(self.joint_stream_api_url, json=payload, timeout=(0.01, 0.02))
         except:
             pass
 
     def _trigger_restore(self):
         try:
-            self.session.post(RESTORE_API_URL, timeout=1.0)
+            self.session.post(self.restore_api_url, timeout=1.0)
         except:
             pass
 
@@ -144,7 +140,7 @@ class DummyStreamRobot(Robot):
             return self._joints_cache
 
         try:
-            response = self.session.get(JOINTS_API_URL, timeout=(0.01, 0.04))
+            response = self.session.get(self.joints_api_url, timeout=(0.01, 0.04))
             if response.status_code == 200:
                 data = response.json()
                 if data.get("status") == "ok":
@@ -173,7 +169,7 @@ class DummyStreamRobot(Robot):
     @check_if_not_connected
     def get_observation(self) -> RobotObservation:
         # Observation always gets a fresh read
-        obs_dict = self._get_joints(use_cache=False)
+        obs_dict = self._get_joints(use_cache=False).copy()
         for cam_key, cam in self.cameras.items():
             obs_dict[cam_key] = cam.read_latest()
         return obs_dict
@@ -181,7 +177,8 @@ class DummyStreamRobot(Robot):
     @check_if_not_connected
     def send_action(self, action: RobotAction) -> RobotAction:
         if "mobile.raw_inputs" in action:
-            raw_inputs = action["mobile.raw_inputs"]
+            raw_inputs = action.pop("mobile.raw_inputs")
+            action.pop("mobile.enabled", None)
             
             # Toggle Active State (B1)
             current_b1 = raw_inputs.get("b1", 0)
