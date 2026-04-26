@@ -8,7 +8,7 @@ from ..config import RobotConfig
 
 @dataclass
 class DummyStreamConfig:
-    ip: str = "192.168.31.7"
+    ip: str = "127.0.0.1"
     port: int = 8001
     cameras: dict[str, CameraConfig] = field(default_factory=dict)
 
