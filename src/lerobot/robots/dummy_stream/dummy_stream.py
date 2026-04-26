@@ -145,7 +145,7 @@ class DummyStreamRobot(Robot):
                 data = response.json()
                 if data.get("status") == "ok":
                     joints = data["joints"]
-                    self._joints_cache = {f"{name}.pos": pos for name, pos in joints.items()}
+                    self._joints_cache = {f"joint_{''.join(filter(str.isdigit, name))}.pos": pos for name, pos in joints.items()}
                     self._last_fetch_time = now
                     return self._joints_cache
         except:
