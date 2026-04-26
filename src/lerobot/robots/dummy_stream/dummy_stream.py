@@ -225,12 +225,12 @@ class DummyStreamRobot(Robot):
         else:
             self._ensure_hardware_connected()
             target_angles = {
-                1: action.get("joint_1.pos", self.my_drive.robot.joint_1.angle - self.joint_bias[1]),
-                2: action.get("joint_2.pos", self.my_drive.robot.joint_2.angle - self.joint_bias[2]),
-                3: action.get("joint_3.pos", self.my_drive.robot.joint_3.angle - self.joint_bias[3]),
-                4: action.get("joint_4.pos", self.my_drive.robot.joint_4.angle - self.joint_bias[4]),
-                5: action.get("joint_5.pos", self.my_drive.robot.joint_5.angle - self.joint_bias[5]),
-                6: action.get("joint_6.pos", self.my_drive.robot.joint_6.angle - self.joint_bias[6]),
+                1: float(action.get("joint_1.pos", self.my_drive.robot.joint_1.angle - self.joint_bias[1])),
+                2: float(action.get("joint_2.pos", self.my_drive.robot.joint_2.angle - self.joint_bias[2])),
+                3: float(action.get("joint_3.pos", self.my_drive.robot.joint_3.angle - self.joint_bias[3])),
+                4: float(action.get("joint_4.pos", self.my_drive.robot.joint_4.angle - self.joint_bias[4])),
+                5: float(action.get("joint_5.pos", self.my_drive.robot.joint_5.angle - self.joint_bias[5])),
+                6: float(action.get("joint_6.pos", self.my_drive.robot.joint_6.angle - self.joint_bias[6])),
             }
             self.my_drive.robot.move_j(
                 target_angles[1] + self.joint_bias[1],
