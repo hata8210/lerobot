@@ -3,6 +3,7 @@
 import sys
 import os
 import time
+import math
 import requests
 from functools import cached_property
 
@@ -42,12 +43,21 @@ class DummyStreamRobot(Robot):
         self.joints_api_url = f"{base_url}/api/joints"
 
         self.joint_bias = {
-            1: 0,
-            2: 77,
-            3: -185,
-            4: 0,
-            5: 0,
-            6: 0
+            1: 0.0,
+            2: 0.0,
+            3: 90.0,
+            4: 0.0,
+            5: 0.0,
+            6: 0.0
+        }
+        
+        self.joint_direction = {
+            1: 1, 
+            2: 1, 
+            3: 1, 
+            4: 1, 
+            5: -1, 
+            6: -1
         }
 
         # Teleop state
@@ -100,7 +110,8 @@ class DummyStreamRobot(Robot):
         self.my_drive = ref_tool.find_any()
         self.my_drive.robot.set_rgb_mode(4)
         self.my_drive.robot.set_enable(1)
-        print("Hardware connected.")
+        self.my_drive.robot.homing()
+        print("Hardware connected and initialized (homing completed).")
 
     @property
     def is_calibrated(self) -> bool:
@@ -153,12 +164,12 @@ class DummyStreamRobot(Robot):
         
         if self.my_drive is not None:
             res = {
-                "joint_1.pos": self.my_drive.robot.joint_1.angle - self.joint_bias[1],
-                "joint_2.pos": self.my_drive.robot.joint_2.angle - self.joint_bias[2],
-                "joint_3.pos": self.my_drive.robot.joint_3.angle - self.joint_bias[3],
-                "joint_4.pos": self.my_drive.robot.joint_4.angle - self.joint_bias[4],
-                "joint_5.pos": self.my_drive.robot.joint_5.angle - self.joint_bias[5],
-                "joint_6.pos": self.my_drive.robot.joint_6.angle - self.joint_bias[6],
+                "joint_1.pos": math.radians((self.my_drive.robot.joint_1.angle * self.joint_direction[1]) - self.joint_bias[1]),
+                "joint_2.pos": math.radians((self.my_drive.robot.joint_2.angle * self.joint_direction[2]) - self.joint_bias[2]),
+                "joint_3.pos": math.radians((self.my_drive.robot.joint_3.angle * self.joint_direction[3]) - self.joint_bias[3]),
+                "joint_4.pos": math.radians((self.my_drive.robot.joint_4.angle * self.joint_direction[4]) - self.joint_bias[4]),
+                "joint_5.pos": math.radians((self.my_drive.robot.joint_5.angle * self.joint_direction[5]) - self.joint_bias[5]),
+                "joint_6.pos": math.radians((self.my_drive.robot.joint_6.angle * self.joint_direction[6]) - self.joint_bias[6]),
             }
             self._joints_cache = res
             self._last_fetch_time = now
@@ -224,22 +235,46 @@ class DummyStreamRobot(Robot):
             
         else:
             self._ensure_hardware_connected()
-            target_angles = {
-                1: float(action.get("joint_1.pos", self.my_drive.robot.joint_1.angle - self.joint_bias[1])),
-                2: float(action.get("joint_2.pos", self.my_drive.robot.joint_2.angle - self.joint_bias[2])),
-                3: float(action.get("joint_3.pos", self.my_drive.robot.joint_3.angle - self.joint_bias[3])),
-                4: float(action.get("joint_4.pos", self.my_drive.robot.joint_4.angle - self.joint_bias[4])),
-                5: float(action.get("joint_5.pos", self.my_drive.robot.joint_5.angle - self.joint_bias[5])),
-                6: float(action.get("joint_6.pos", self.my_drive.robot.joint_6.angle - self.joint_bias[6])),
+            
+            def safe_float(val):
+                if hasattr(val, "item"):
+                    return float(val.item())
+                return float(val)
+                
+            # Extract action (in radians)
+            target_radians = {
+                1: safe_float(action.get("joint_1.pos", math.radians((self.my_drive.robot.joint_1.angle * self.joint_direction[1]) - self.joint_bias[1]))),
+                2: safe_float(action.get("joint_2.pos", math.radians((self.my_drive.robot.joint_2.angle * self.joint_direction[2]) - self.joint_bias[2]))),
+                3: safe_float(action.get("joint_3.pos", math.radians((self.my_drive.robot.joint_3.angle * self.joint_direction[3]) - self.joint_bias[3]))),
+                4: safe_float(action.get("joint_4.pos", math.radians((self.my_drive.robot.joint_4.angle * self.joint_direction[4]) - self.joint_bias[4]))),
+                5: safe_float(action.get("joint_5.pos", math.radians((self.my_drive.robot.joint_5.angle * self.joint_direction[5]) - self.joint_bias[5]))),
+                6: safe_float(action.get("joint_6.pos", math.radians((self.my_drive.robot.joint_6.angle * self.joint_direction[6]) - self.joint_bias[6]))),
             }
-            self.my_drive.robot.move_j(
-                target_angles[1] + self.joint_bias[1],
-                target_angles[2] + self.joint_bias[2],
-                target_angles[3] + self.joint_bias[3],
-                target_angles[4] + self.joint_bias[4],
-                target_angles[5] + self.joint_bias[5],
-                target_angles[6] + self.joint_bias[6]
+            
+            print(f"[DEBUG] Target Angles (from dataset, rad): "
+                  f"J1: {target_radians[1]:.3f}, J2: {target_radians[2]:.3f}, J3: {target_radians[3]:.3f}, "
+                  f"J4: {target_radians[4]:.3f}, J5: {target_radians[5]:.3f}, J6: {target_radians[6]:.3f}")
+            
+            # Convert to degrees and apply formula: Actual Hardware Angle = (Program Degrees + Bias) * Direction
+            hw_targets = {
+                i: (math.degrees(rad) + self.joint_bias[i]) * self.joint_direction[i] 
+                for i, rad in target_radians.items()
+            }
+            
+            print(f"[DEBUG] Sent to hardware (deg + bias + dir): "
+                  f"J1: {hw_targets[1]:.3f}, J2: {hw_targets[2]:.3f}, "
+                  f"J3: {hw_targets[3]:.3f}, J4: {hw_targets[4]:.3f}, "
+                  f"J5: {hw_targets[5]:.3f}, J6: {hw_targets[6]:.3f}")
+
+            success = self.my_drive.robot.move_j(
+                hw_targets[1],
+                hw_targets[2],
+                hw_targets[3],
+                hw_targets[4],
+                hw_targets[5],
+                hw_targets[6]
             )
+            print(f"[DEBUG] move_j return: {success}")
         return action
 
     @check_if_not_connected
