@@ -1,0 +1,556 @@
+--安装
+
+wget "https://github.com/conda-forge/miniforge/releases/latest/download/Miniforge3-$(uname)-$(uname -m).sh"
+bash Miniforge3-$(uname)-$(uname -m).sh
+conda create -y -n lerobot python=3.12
+conda activate lerobot
+conda install ffmpeg -c conda-forge
+conda install ffmpeg=7.1.1 -c conda-forge
+ffmpeg -version
+pip install -e .
+pip install -e ".[feetech]"
+pip install -e ".[camera]"
+pip install -e ".[phone]"
+pip install -e ".[smolvla]"
+pip install -e ".[async]"  --算力端和robot端都需要安装
+
+pip install pyusb
+pip install odrive==0.5.1.post0
+sudo usermod -aG plugdev $USER
+sudo usermod -aG dialout $USER
+sudo usermod -aG video $USER
+sudo vim /etc/udev/rules.d/99-odrive.rules
+写入:SUBSYSTEM=="usb", ATTR{idVendor}=="1209", ATTR{idProduct}=="0d32", MODE="0666"
+sudo udevadm control --reload-rules
+sudo udevadm trigger
+
+让cuda适配笔记本上1050显卡（可选，笔记本已换1650显卡）
+pip uninstall torch torchvision torchaudio -y
+pip install torch==2.2.2 torchvision==0.17.2 torchaudio==2.2.2 --index-url https://download.pytorch.org/whl/cu118
+pip install "numpy<2"
+ipython验证
+import torch
+print(torch.__version__)
+print(torch.version.cuda)
+torch.cuda.is_available()
+print(torch.cuda.get_device_name(0))
+
+pip uninstall torchcodec -y  --lerobot-dataset-viz需要这样
+
+代码github地址与token
+https://github.com/hata8210/lerobot.git
+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
+
+--查看串口信息
+
+lerobot-find-port
+
+L6 C046 The port of this MotorsBus is '/dev/ttyACM0'
+
+lerobot-setup-motors \
+    --robot.type=so101_follower \
+    --robot.port=/dev/ttyACM0
+
+lerobot-setup-motors \
+    --teleop.type=so101_leader \
+    --teleop.port=/dev/ttyACM0
+
+sudo chmod 666 /dev/ttyACM*
+
+
+--标定机械比
+
+arm1
+
+lerobot-calibrate \
+    --teleop.type=so101_leader \
+    --teleop.port=/dev/ttyACM0 \
+    --teleop.id=my_awesome_leader_arm
+
+lerobot-calibrate \
+    --robot.type=so101_follower \
+    --robot.port=/dev/ttyACM1 \
+    --robot.id=my_awesome_follower_arm
+
+arm2
+
+lerobot-calibrate \
+    --teleop.type=so101_leader \
+    --teleop.port=/dev/ttyACM2 \
+    --teleop.id=my_awesome_leader_arm2
+
+lerobot-calibrate \
+    --robot.type=so101_follower \
+    --robot.port=/dev/ttyACM3 \
+    --robot.id=my_awesome_follower_arm2
+
+
+leader
+-------------------------------------------
+-------------------------------------------
+NAME            |    MIN |    POS |    MAX
+shoulder_pan    |    769 |   2113 |   3373
+shoulder_lift   |    820 |    824 |   3202
+elbow_flex      |    824 |   3036 |   3046
+wrist_flex      |    883 |   2646 |   3223
+gripper         |   1566 |   1579 |   2874
+
+follower
+-------------------------------------------
+-------------------------------------------
+NAME            |    MIN |    POS |    MAX
+shoulder_pan    |    885 |   2093 |   3454
+shoulder_lift   |    824 |    832 |   3204
+elbow_flex      |    936 |   3141 |   3148
+wrist_flex      |    816 |   2823 |   3177
+gripper         |   1412 |   1422 |   2894
+
+
+
+--测试遥操作
+
+lerobot-find-cameras
+
+arm1
+
+lerobot-teleoperate \
+    --robot.type=so101_follower \
+    --robot.port=/dev/ttyACM1 \
+    --robot.id=my_awesome_follower_arm \
+    --robot.cameras="{ env1: {type: opencv, index_or_path: 0, width: 640, height: 480, fps: 30},env2: {type: opencv, index_or_path: 2, width: 640, height: 480, fps: 30}}" \
+    --teleop.type=so101_leader \
+    --teleop.port=/dev/ttyACM0 \
+    --teleop.id=my_awesome_leader_arm \
+    --display_data=true
+
+arm2
+
+lerobot-teleoperate \
+    --robot.type=so101_follower \
+    --robot.port=/dev/ttyACM3 \
+    --robot.id=my_awesome_follower_arm2 \
+    --robot.cameras="{ front: {type: opencv, index_or_path: 0, width: 640, height: 480, fps: 30}}" \
+    --teleop.type=so101_leader \
+    --teleop.port=/dev/ttyACM2 \
+    --teleop.id=my_awesome_leader_arm2 \
+    --display_data=true
+
+
+--采集数据（单臂）
+
+
+lerobot-record \
+    --robot.type=so101_follower \
+    --robot.port=/dev/ttyACM1 \
+    --robot.id=my_awesome_follower_arm \
+    --robot.cameras="{ front: {type: opencv, index_or_path: 0, width: 640, height: 480, fps: 30}}" \
+    --teleop.type=so101_leader \
+    --teleop.port=/dev/ttyACM0 \
+    --teleop.id=my_awesome_leader_arm \
+    --display_data=true \
+    --dataset.repo_id=demo_data/record-test \
+    --dataset.num_episodes=2 \
+    --dataset.single_task="Grab the black cube" \
+    --dataset.streaming_encoding=true \
+    --dataset.encoder_threads=2 \
+    --dataset.push_to_hub=false
+    
+    --dataset.episode_time_s=60 Duration of each data recording episode (default: 60 seconds).
+    --dataset.reset_time_s=60 Duration for resetting the environment after each episode (default: 60 seconds).
+    
+    Press Right Arrow (→): Early stop the current episode or reset time and move to the next.
+    Press Left Arrow (←): Cancel the current episode and re-record it.
+    Press Escape (ESC): Immediately stop the session, encode videos, and upload the dataset.    
+
+rm -rf /home/kamfu/.cache/huggingface/lerobot/demo_data/record-test
+
+
+
+--回放采集数据（单臂）
+
+lerobot-replay \
+    --robot.type=so101_follower \
+    --robot.port=/dev/ttyACM1 \
+    --robot.id=my_awesome_follower_arm \
+    --dataset.repo_id=demo_data/record-test \
+    --dataset.episode=0 
+    
+    
+--训练（单臂）
+
+lerobot-train \
+  --dataset.repo_id=demo_data/record-test \
+  --policy.type=act \
+  --output_dir=outputs/train/act_so101_test \
+  --job_name=act_so101_test \
+  --policy.device=cpu \   --（可选）官方指定为cuda
+  --wandb.enable=false \
+  --policy.repo_id=demo_data/my_policy \
+  --dataset.video_backend=pyav    --（可选）默认是FFmpeg
+
+--评估（含推理）（单臂）
+    
+lerobot-record \
+  --robot.type=so100_follower \
+  --robot.port=/dev/ttyACM1 \
+  --robot.id=my_awesome_follower_arm \
+  --robot.cameras="{ front: {type: opencv, index_or_path: 0, width: 640, height: 480, fps: 30}}" \
+  --display_data=true \
+  --dataset.repo_id=demo_data/eval-test \
+  --dataset.num_episodes=10 \
+  --dataset.single_task="Grab the black cube" \
+  --dataset.streaming_encoding=true \
+  --dataset.encoder_threads=2 \
+  --policy.path=demo_data/my_policy
+  --dataset.push_to_hub=false
+
+--双臂部署
+
+lerobot-calibrate \
+    --teleop.type=bi_so_leader \
+    --teleop.left_arm_config.port=/dev/ttyACM0 \
+    --teleop.right_arm_config.port=/dev/ttyACM2 \
+    --teleop.id=my_awesome_leader_arm_bi
+
+lerobot-calibrate \
+    --robot.type=bi_so_follower \
+    --robot.left_arm_config.port=/dev/ttyACM1 \
+    --robot.right_arm_config.port=/dev/ttyACM3 \
+    --robot.id=my_awesome_follower_arm_bi
+
+lerobot-teleoperate \
+    --robot.type=bi_so_follower \
+    --robot.id=my_awesome_follower_arm_bi \
+    --robot.left_arm_config.port=/dev/ttyACM1 \
+    --robot.right_arm_config.port=/dev/ttyACM3 \
+    --teleop.type=bi_so_leader \
+    --teleop.id=my_awesome_leader_arm_bi \
+    --teleop.left_arm_config.port=/dev/ttyACM0 \
+    --teleop.right_arm_config.port=/dev/ttyACM2 \
+    --display_data=false
+
+lerobot-teleoperate \
+    --robot.type=bi_so_follower \
+    --robot.id=my_awesome_follower_arm_bi \
+    --robot.left_arm_config.port=/dev/ttyACM1 \
+    --robot.left_arm_config.cameras="{ front: {type: opencv, index_or_path: 4, width: 640, height: 480, fps: 30},env: {type: opencv, index_or_path: 6, width: 640, height: 480, fps: 30}}" \
+    --robot.right_arm_config.port=/dev/ttyACM3 \
+    --robot.right_arm_config.cameras="{ front: {type: opencv, index_or_path: 2, width: 640, height: 480, fps: 30}}" \
+    --teleop.type=bi_so_leader \
+    --teleop.id=my_awesome_leader_arm_bi \
+    --teleop.left_arm_config.port=/dev/ttyACM0 \
+    --teleop.right_arm_config.port=/dev/ttyACM2 \
+    --display_data=true
+
+lerobot-record \
+    --robot.type=bi_so_follower \
+    --robot.id=my_awesome_follower_arm_bi \
+    --robot.left_arm_config.port=/dev/ttyACM1 \
+    --robot.left_arm_config.cameras="{ front: {type: opencv, index_or_path: 4, width: 640, height: 480, fps: 30},env: {type: opencv, index_or_path: 6, width: 640, height: 480, fps: 30}}" \
+    --robot.right_arm_config.port=/dev/ttyACM3 \
+    --robot.right_arm_config.cameras="{ front: {type: opencv, index_or_path: 2, width: 640, height: 480, fps: 30}}" \
+    --teleop.type=bi_so_leader \
+    --teleop.id=my_awesome_leader_arm_bi \
+    --teleop.left_arm_config.port=/dev/ttyACM0 \
+    --teleop.right_arm_config.port=/dev/ttyACM2 \
+    --display_data=false \
+    --dataset.repo_id=demo_data/record-test-2 \
+    --dataset.num_episodes=40 \
+    --dataset.single_task="Grab the green cube" \
+    --dataset.streaming_encoding=true \
+    --dataset.encoder_threads=2 \
+    --dataset.push_to_hub=false \
+    --resume=true    --增量录制
+
+rm -rf /home/kamfu/.cache/huggingface/lerobot/demo_data/record-test
+
+Press Right Arrow (→): Early stop the current episode or reset time and move to the next.
+Press Left Arrow (←): Cancel the current episode and re-record it.
+Press Escape (ESC): Immediately stop the session, encode videos, and upload the dataset.  
+
+lerobot-edit-dataset --repo_id demo_data/record-test --operation.type info
+
+demo_data/record-test，task="Grab the red cube"，问题记录：10空，19 23 30 32 33碰撞
+demo_data/record-test-2，task="Grab the green cube"，问题记录：无
+
+lerobot-replay \
+    --robot.type=bi_so_follower \
+    --robot.id=my_awesome_follower_arm_bi \
+    --robot.left_arm_config.port=/dev/ttyACM1 \
+    --robot.right_arm_config.port=/dev/ttyACM3 \
+    --dataset.repo_id=demo_data/record-test \
+    --dataset.episode=0 
+
+--操作数据集
+
+lerobot-edit-dataset \
+    --repo_id demo_data/record-test \
+    --operation.type delete_episodes \
+    --operation.episode_indices "[10]"
+
+lerobot-edit-dataset \
+    --repo_id demo_data/record-grab-cube \
+    --operation.type merge \
+    --operation.repo_ids "['demo_data/record-test', 'demo_data/record-test-2']"
+
+lerobot-dataset-viz \
+    --repo-id demo_data/record-grab-cube \
+    --mode local \
+    --episode-index 0 
+    
+--训练（双臂）
+
+ssh finetune@192.168.4.22
+LiL5a6k5Zn9WL6KVLKy
+scp -r /home/kamfu/.cache/huggingface/lerobot/demo_data/record-grab-cube finetune@192.168.4.22:/home/finetune/.cache/huggingface/lerobot/demo_data/
+
+act训练
+lerobot-train \
+  --dataset.repo_id=demo_data/record-grab-cube \
+  --policy.type=act \
+  --output_dir=outputs/train/act_grab_cube_250k \
+  --job_name=act_grab_cube \
+  --policy.device=cuda \
+  --wandb.enable=false \
+  --policy.repo_id=demo_data/act_grab_cube_250k \
+  --policy.push_to_hub=false \
+  --steps=250000 
+nvtop观察占用现存情况，A40显卡占用6.9G显存，GPU占用91%
+0.03 loss:7.303 grdn:157.133 lr:1.0e-05 updt_s:0.203 data_s:0.010
+Training:   0%|▏                                            | 400/100000 [01:22<5:33:41,  4.97step/s]
+训练160000 steps貌似最合理，夹住的成功绿比100000 steps更好，到180000 steps开始over fitting，出现交接失败，放下积木失败等奇怪情况
+
+smolvla训练
+不使用--policy.type=smolvla，因为这是在base权重进行finetune
+lerobot-train \
+  --dataset.repo_id=demo_data/record-grab-cube \
+  --policy.path=/home/finetune/apps/gemini/lerobot/models/smolvla_base \
+  --policy.vlm_model_name=/home/finetune/apps/gemini/lerobot/models/SmolVLM2-500M-Video-Instruct \
+  --output_dir=outputs/train/smolvla_grab_cube_100k \
+  --job_name=smolvla_grab_cube \
+  --policy.device=cuda \
+  --wandb.enable=false \
+  --policy.repo_id=demo_data/smolvla_grab_cube_100k \
+  --policy.push_to_hub=false \
+  --batch_size=64 \
+  --steps=300000 \
+  --rename_map='{"observation.images.left_env": "observation.images.camera1",
+      "observation.images.left_front": "observation.images.camera2",
+      "observation.images.right_front": "observation.images.camera3"}' 
+由于网络受限不能联网下载模型，替换了一对模型路径
+✓  Edit src/.../configuration_smolvla.py:   
+│ 87 - vlm_model_name: str = "HuggingFaceTB/SmolVLM2-500M-Video-Instruct" # Select theVLM backbone.
+│ 87 + vlm_model_name: str = "models/SmolVLM2-500M-Video-Instruct"  # Select the VLM backbone. 
+下载的模型文件夹里面执行替换路径
+sed -i 's|HuggingFaceTB/SmolVLM2-500M-Video-Instruct|/home/finetune/apps/gemini/lerobot/models/SmolVLM2-500M-Video-Instruct|g' models/smolvla_base/policy_preprocessor.json models/smolvla_base/config.json src/lerobot/policies/smolvla/configuration_smolvla.py
+使用batch_size=64，nvtop观察占用现存情况，A40显卡占用22G显存，GPU占用几乎满载97%
+
+xvla训练
+lerobot-train \
+  --dataset.repo_id=demo_data/record-grab-cube \
+  --policy.path=/home/finetune/apps/gemini/lerobot/models/xvla_base \
+  --output_dir=outputs/train/xvla_grab_cube_100k \
+  --job_name=xvla_grab_cube \
+  --policy.dtype=bfloat16 \
+  --policy.device=cuda \
+  --wandb.enable=false \
+  --policy.repo_id=demo_data/xvla_grab_cube_300k \
+  --policy.push_to_hub=false \
+  --batch_size=16 \
+  --steps=300000 \
+  --policy.action_mode=auto \
+  --policy.freeze_vision_encoder=false \
+  --policy.freeze_language_encoder=false \
+  --policy.train_policy_transformer=true \
+  --policy.train_soft_prompts=true \
+  --rename_map='{"observation.images.left_env": "observation.images.image",
+      "observation.images.left_front": "observation.images.image2",
+      "observation.images.right_front": "observation.images.image3"}' 
+模型config等相关文件中也同样需要替换本地路径，如果不想访问huggingface下载东西的话
+使用batch_size=16，nvtop观测使用了30G显存内进行训练，GPU占用100%
+nohup lerobot-train   --dataset.repo_id=demo_data/record-grab-cube   --policy.path=/home/finetune/apps/gemini/lerobot/models/xvla_base   --output_dir=outputs/train/xvla_grab_cube_100k   --job_name=xvla_grab_cube   --policy.dtype=bfloat16   --policy.device=cuda   --wandb.enable=false   --policy.repo_id=demo_data/xvla_grab_cube_300k   --policy.push_to_hub=false   --batch_size=16   --steps=300000   --policy.action_mode=auto   --policy.freeze_vision_encoder=false   --policy.freeze_language_encoder=false   --policy.train_policy_transformer=true   --policy.train_soft_prompts=true   --rename_map='{"observation.images.left_env": "observation.images.image", "observation.images.left_front": "observation.images.image2", "observation.images.right_front": "observation.images.image3"}'   > outputs/train.log 2>&1 &
+
+
+断点续练
+lerobot-train \
+  --config_path=outputs/train/act_grab_cube_250k/checkpoints/last/pretrained_model/train_config.json \
+  --resume=true
+
+
+--异步推理
+nvtop观察占用现存情况，A40显卡占用0.8G显存，GPU占用20%
+
+python -m lerobot.async_inference.policy_server \
+     --host=192.168.4.22 \
+     --port=18080
+
+python -m lerobot.async_inference.robot_client \
+    --server_address=192.168.4.22:18080 \
+    --robot.type=bi_so_follower \
+    --robot.id=my_awesome_follower_arm_bi \
+    --robot.left_arm_config.port=/dev/ttyACM1 \
+    --robot.left_arm_config.cameras="{ front: {type: opencv, index_or_path: 3, width: 640, height: 480, fps: 30},env: {type: opencv, index_or_path: 6, width: 640, height: 480, fps: 30}}" \
+    --robot.right_arm_config.port=/dev/ttyACM3 \
+    --robot.right_arm_config.cameras="{ front: {type: opencv, index_or_path: 4, width: 640, height: 480, fps: 30}}" \
+    --task="Grab the green cube" \
+    --policy_type=xvla \
+    --pretrained_name_or_path=/home/finetune/apps/gemini/lerobot/outputs/train/xvla_grab_cube_100k/checkpoints/020000/pretrained_model \
+    --policy_device=cuda \
+    --actions_per_chunk=30 \
+    --chunk_size_threshold=0.3 \
+    --aggregate_fn_name=weighted_average \
+    --debug_visualize_queue_size=false \
+    --rename_map='{"observation.images.left_env": "observation.images.image",
+      "observation.images.left_front": "observation.images.image2",
+      "observation.images.right_front": "observation.images.image3"}'
+act模型（训练后）
+    --policy_type=act \
+    --pretrained_name_or_path=/home/finetune/apps/gemini/lerobot/outputs/train/act_grab_cube_250k/checkpoints/160000/pretrained_model \
+smolvla模型（训练后）
+    --policy_type=smolvla \
+    --pretrained_name_or_path=/home/finetune/apps/gemini/lerobot/outputs/train/smolvla_grab_cube_100k/checkpoints/100000/pretrained_model \
+    --rename_map='{"observation.images.left_env": "observation.images.camera1",
+      "observation.images.left_front": "observation.images.camera2",
+      "observation.images.right_front": "observation.images.camera3"}'
+smolvla模型（训练前）
+    --policy_type=smolvla \
+    --pretrained_name_or_path=/home/finetune/apps/gemini/lerobot/models/smolvla_base \
+xvla模型（训练前）
+    --policy_type=xvla \
+    --pretrained_name_or_path=/home/finetune/apps/gemini/lerobot/models/xvla_base \
+    --rename_map='{"observation.images.left_env": "observation.images.image",
+      "observation.images.left_front": "observation.images.image2",
+      "observation.images.right_front": "observation.images.image3"}'
+本地模型（训练后）
+/home/kamfu/apps/gemini/lerobot/outputs/train/act_grab_cube_250k/checkpoints/160000/pretrained_model
+/home/kamfu/apps/gemini/lerobot/outputs/train/smolvla_grab_cube_100k/checkpoints/100000/pretrained_model
+
+--实时推理
+cd /home/kamfu/apps/gemini/lerobot
+python examples/rtc/eval_with_real_robot.py \
+    --policy.path=/home/kamfu/apps/gemini/lerobot/outputs/train/smolvla_grab_cube_100k/checkpoints/020000/pretrained_model \
+    --robot.type=bi_so_follower \
+    --robot.id=my_awesome_follower_arm_bi \
+    --robot.left_arm_config.port=/dev/ttyACM1 \
+    --robot.left_arm_config.cameras="{ front: {type: opencv, index_or_path: 2, width: 640, height: 480, fps: 30},env: {type: opencv, index_or_path: 6, width: 640, height: 480, fps: 30}}" \
+    --robot.right_arm_config.port=/dev/ttyACM3 \
+    --robot.right_arm_config.cameras="{ front: {type: opencv, index_or_path: 4, width: 640, height: 480, fps: 30}}" \
+    --task="Grab the green cube" \
+    --rtc.execution_horizon=40 \
+    --action_queue_size_to_get_new_actions=20 \
+    --fps=30.0 \
+    --duration=1200 \
+    --device=cuda
+额外参数：
+    --rtc.enabled=true \
+    --rtc.execution_horizon=40 \
+    --action_queue_size_to_get_new_actions=20 \
+    --fps=15.0 \
+smolvla模型（训练后，不用remap）
+    --policy.path=/home/kamfu/apps/gemini/lerobot/outputs/train/smolvla_grab_cube_100k/checkpoints/020000/pretrained_model \
+xvla模型（训练前,需要remap）
+    --policy.path=/home/kamfu/apps/gemini/lerobot/models/xvla_base \
+    --rename_map '{"observation.images.left_front": "observation.images.image","observation.images.left_env": "observation.images.image2", "observation.images.right_front": "observation.images.image3"}' \
+
+
+结论：
+1.异步推理修改了源码支持了rename_map属性才能成功运行，验证过映射是有效的
+2.异步推理本地1050的推理比远程a40推理明显更流畅
+3.异步推理smolvla比较弱智，会像反复撤回动作，然后会卡在交换手的前后不前进
+4.实时推理不用修改源码，本身没有cameras不对应的问题
+5.实时推理则没有出现异步推理的问题，动作较为流畅，能完成任务，但夹起东西的泛化还是不好
+6.实时推理发现20000步checkpoints已经可以完成人物，后面一直到260000步没变化，甚至可能over fit
+7.同样task和数据集，act模型训练160000 steps效果最好，smolvla模型（已pretrain）训练20000 steps就差不多
+8.使用xvla实时推理，0.9B的模型居然4G显存不够用，内存爆了，异步推理看到推理要用到4.5G显存，异步推理没有出现smolvla抽风的现象
+9.使用xvla异步推理，20000 steps的效果夹住积木环节稍稍优于同样steps的smolvla,另外对于拒绝指令外颜色积木抗拒强烈一点，可以指令完成两种颜色的task,语言泛化优于smolvla
+10.使用xvla异步推理，100000 steps效果也差不多，拒绝异样颜色的意图更强烈，但夹取好像变傻一点，可能已经overfit了
+
+
+
+
+
+--dummy训练act模型
+遥操（不带摄像头）
+lerobot-teleoperate \
+    --robot.type=dummy_stream \
+    --robot.id=my_awesome_dummy \
+    --robot.ip=192.168.31.7 \
+    --teleop.type=mobile \
+    --teleop.id=my_awesome_mobile
+遥操（带摄像头）
+lerobot-teleoperate \
+    --robot.type=dummy_stream \
+    --robot.id=my_awesome_dummy \
+    --robot.ip=192.168.31.7 \
+    --robot.cameras="{ front: {type: opencv, index_or_path: 2, width: 640, height: 480, fps: 30}, env: {type: opencv, index_or_path: 8, width: 640, height: 480, fps: 30}}" \
+    --teleop.type=mobile \
+    --teleop.id=my_awesome_mobile \
+    --display_data=false
+---------------------------
+NAME              |    NORM
+Joint1.pos        |   -0.18
+Joint2.pos        |   -0.51
+Joint3.pos        |    0.41
+Joint4.pos        |    1.30
+Joint5.pos        |   -1.25
+Joint6.pos        |    0.21
+采集数据
+lerobot-record \
+    --robot.type=dummy_stream \
+    --robot.id=my_awesome_dummy \
+    --robot.ip=192.168.31.7 \
+    --robot.cameras="{ front: {type: opencv, index_or_path: 2, width: 640, height: 480, fps: 30}, env: {type: opencv, index_or_path: 8, width: 640, height: 480, fps: 30}}" \
+    --teleop.type=mobile \
+    --teleop.id=my_awesome_mobile \
+    --display_data=false \
+    --dataset.repo_id=dummy_demo_data/record-test \
+    --dataset.num_episodes=5 \
+    --dataset.episode_time_s=120 \
+    --dataset.reset_time_s=120 \
+    --dataset.single_task="click the button" \
+    --dataset.streaming_encoding=true \
+    --dataset.encoder_threads=2 \
+    --dataset.fps=15 \
+    --dataset.push_to_hub=false
+rm -rf /home/kamfu/.cache/huggingface/lerobot/dummy_demo_data/record-test
+检查数据集
+lerobot-edit-dataset --repo_id dummy_demo_data/record-test --operation.type info
+lerobot-replay \
+    --robot.type=dummy_stream \
+    --robot.id=my_awesome_dummy \
+    --dataset.repo_id=dummy_demo_data/record-test \
+    --dataset.episode=0 
+act训练
+lerobot-train \
+  --dataset.repo_id=dummy_demo_data/record-test \
+  --policy.type=act \
+  --output_dir=outputs/train/act_click_250k \
+  --job_name=act_click \
+  --policy.device=cuda \
+  --wandb.enable=false \
+  --policy.repo_id=dummy_demo_data/act_grab_cube_250k \
+  --policy.push_to_hub=false \
+  --steps=250000 
+实时推理
+cd /home/kamfu/apps/gemini/lerobot
+python examples/rtc/eval_with_real_robot.py \
+    --policy.path=/home/kamfu/apps/gemini/lerobot/outputs/train/act_grab_cube_250k/checkpoints/020000/pretrained_model \
+    --robot.type=dummy_stream \
+    --robot.id=my_awesome_dummy \
+    --robot.cameras="{ front: {type: opencv, index_or_path: 2, width: 640, height: 480, fps: 30}, env: {type: opencv, index_or_path: 8, width: 640, height: 480, fps: 30}}" \
+    --task="click the button" \
+    --rtc.execution_horizon=40 \
+    --action_queue_size_to_get_new_actions=20 \
+    --fps=30.0 \
+    --duration=1200 \
+    --device=cuda
+
+    
+    
+record到replay时dummy_stream的轨迹纠正
+日志：J1: 39.844, J2: -38.527, J3: 172.899, J4: -130.253, J5: -55.676, J6: -146.711
+传递：(39.844,-38.527,172.899,-130.253,-55.676,-146.711)
+纠正：(39.844,-38.527,172.899,-130.253,55.676,-146.711)
+
+
+
